@@ -725,6 +725,23 @@ public class MapSerializersTest extends FuryTestBase {
     serDeCheck(fury, mapFieldsObject);
   }
 
+//  @Test
+//  public void testStringMap() {
+//      Fury fury =
+//              Fury.builder()
+//                      .withRefTracking(false)
+//                      .withCodegen(false)
+//                      .requireClassRegistration(false)
+//                      .build();
+//      Map<String, String> maps = new HashMap<>();
+//      for (int i = 0; i < 10; i++) {
+//          maps.put(i + "", i + "");
+//      }
+//      final byte[] serialize = fury.serialize(maps);
+//      final Object deserialize = fury.deserialize(serialize);
+//
+//  }
+
   private static Map<Object, Object> createDifferentKeyAndValueTypeMap() {
     Map<Object, Object> map = new HashMap<>();
     map.put(null, "1");

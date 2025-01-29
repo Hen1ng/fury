@@ -41,7 +41,7 @@ public class StringMapSerialization {
             MemoryBuffer buffer,
             Map.Entry<String, String> entry,
             Iterator<Map.Entry<String, String>> iterator) {
-
+        return null;
     }
 
     /**
@@ -64,7 +64,7 @@ public class StringMapSerialization {
 
     public static int readChunk(
             MemoryBuffer buffer, Map<String, String> map, long size, int chunkHeader) {
-
+        return 0;
     }
 
 }
