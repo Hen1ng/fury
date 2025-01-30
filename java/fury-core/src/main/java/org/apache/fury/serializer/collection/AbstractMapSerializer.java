@@ -275,9 +275,8 @@ public abstract class AbstractMapSerializer<T> extends Serializer<T> {
     Class keyType = key.getClass();
     Class valueType = value.getClass();
     // place holder for chunk header and size.
-    buffer.writeInt16((short) -1);
-    int chunkSizeOffset = buffer.writerIndex() - 1;
-    int chunkHeader = 0;
+      int chunkSizeOffset = preserveByte(buffer);
+      int chunkHeader = 0;
     if (keySerializer != null) {
       chunkHeader |= KEY_DECL_TYPE;
     } else {
@@ -291,44 +290,76 @@ public abstract class AbstractMapSerializer<T> extends Serializer<T> {
     // noinspection Duplicates
     boolean keyWriteRef = keySerializer.needToWriteRef();
     boolean valueWriteRef = valueSerializer.needToWriteRef();
-    if (keyWriteRef) {
-      chunkHeader |= TRACKING_KEY_REF;
-    }
-    if (valueWriteRef) {
-      chunkHeader |= TRACKING_VALUE_REF;
-    }
+    chunkHeader = updateHeader(chunkHeader, keyWriteRef, valueWriteRef);
     buffer.putByte(chunkSizeOffset - 1, (byte) chunkHeader);
-    RefResolver refResolver = fury.getRefResolver();
     // Use int to make chunk size representable for 0~255 instead of 0~127.
     int chunkSize = 0;
-    while (true) {
-      if (key == null
-          || value == null
-          || (key.getClass() != keyType)
-          || (value.getClass() != valueType)) {
-        break;
+      while (!needBreak(entry, keyType, valueType, chunkSize)) {
+          writeKeyValue(keyWriteRef, valueWriteRef, buffer, keySerializer, key, valueSerializer, value);
+          // noinspection Duplicates
+          if (++chunkSize == MAX_CHUNK_SIZE) {
+              break;
+          }
+          entry = getNextEntry(iterator);
       }
-      if (!keyWriteRef || !refResolver.writeRefOrNull(buffer, key)) {
-        keySerializer.write(buffer, key);
-      }
-      if (!valueWriteRef || !refResolver.writeRefOrNull(buffer, value)) {
-        valueSerializer.write(buffer, value);
-      }
-      // noinspection Duplicates
-      if (++chunkSize == MAX_CHUNK_SIZE) {
-        break;
-      }
-      if (iterator.hasNext()) {
-        entry = iterator.next();
-        key = entry.getKey();
-        value = entry.getValue();
-      } else {
-        entry = null;
-        break;
-      }
-    }
     buffer.putByte(chunkSizeOffset, (byte) chunkSize);
     return entry;
+  }
+
+
+
+  private void updateChunkSize(MemoryBuffer buffer,int chunkSize, int chunkHeader, int chunkSizeOffset) {
+      short combined = (short) ((((byte) chunkSize & 0xFF) << 8) | ((byte) chunkHeader & 0xFF));
+      buffer.putByte(chunkSizeOffset, combined);
+  }
+
+  private void writeKeyValue(boolean keyWriteRef, boolean valueWriteRef, MemoryBuffer buffer, Serializer keySerializer, Object key, Serializer valueSerializer, Object value) {
+      writeKey(keyWriteRef, buffer, keySerializer, key);
+      writeValue(valueWriteRef, buffer, valueSerializer, value);
+  }
+
+  private int preserveByte(MemoryBuffer buffer) {
+      buffer.writeInt16((short) -1);
+      return buffer.writerIndex() - 1;
+  }
+
+  private Entry getNextEntry(Iterator<Entry<Object, Object>> iterator) {
+      if (iterator.hasNext()) {
+          return iterator.next();
+      } else {
+          return null;
+      }
+  }
+
+  private int updateHeader(int chunkHeader, boolean keyWriteRef, boolean valueWriteRef) {
+      if (keyWriteRef) {
+          chunkHeader |= TRACKING_KEY_REF;
+      }
+      if (valueWriteRef) {
+          chunkHeader |= TRACKING_VALUE_REF;
+      }
+      return chunkHeader;
+  }
+
+  private boolean needBreak(Entry<Object, Object> entry, Class keyType, Class valueType, int chunkSize) {
+      return entry == null
+              || entry.getKey() == null
+              || entry.getValue() == null
+//              || chunkSize == MAX_CHUNK_SIZE
+              || (entry.getKey().getClass() != keyType)
+              || (entry.getValue().getClass() != valueType);
+  }
+
+  private void writeValue(boolean valueWriteRef, MemoryBuffer buffer, Serializer valueSerializer, Object value) {
+      if (!valueWriteRef || !fury.getRefResolver().writeRefOrNull(buffer, value)) {
+          valueSerializer.write(buffer, value);
+      }
+  }
+
+  private void writeKey(boolean keyWriteRef, MemoryBuffer buffer, Serializer keySerializer, Object key) {
+      if (!keyWriteRef || !fury.getRefResolver().writeRefOrNull(buffer, key)) {
+          keySerializer.write(buffer, key);
+      }
   }
 
   private Serializer writeKeyClassInfo(
