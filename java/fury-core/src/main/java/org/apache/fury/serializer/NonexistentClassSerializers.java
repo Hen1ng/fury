@@ -77,6 +77,7 @@ public final class NonexistentClassSerializers {
       classInfoHolder = fury.getClassResolver().nilClassInfoHolder();
       fieldsInfoMap = new LongMap<>();
       Preconditions.checkArgument(fury.getConfig().isMetaShareEnabled());
+
     }
 
     /**
